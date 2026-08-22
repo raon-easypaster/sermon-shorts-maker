@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { loadSetting, saveSetting } from "@/lib/settings";
 import type { TemplateId } from "@/lib/types";
 import { TEMPLATES } from "@/lib/layout";
+import { sanitizeApiKey, describeApiKey } from "@/lib/format";
 
 export interface SetupValues {
   apiKey: string;
@@ -86,10 +87,11 @@ export default function SetupForm({
 
   function submit() {
     if (!url.trim()) return;
-    void saveSetting("gemini_api_key", apiKey.trim());
+    const cleanKey = sanitizeApiKey(apiKey);
+    void saveSetting("gemini_api_key", cleanKey);
     void saveSetting("church_name", churchName.trim());
     onSubmit({
-      apiKey: apiKey.trim(),
+      apiKey: cleanKey,
       url: url.trim(),
       targetSec,
       template,
@@ -123,7 +125,7 @@ export default function SetupForm({
                 setApiKey(e.target.value);
                 setSavedKey(false);
               }}
-              placeholder="AIza..."
+              placeholder="AIza... 또는 AQ..."
               className="input pr-12"
             />
             <button
@@ -134,6 +136,12 @@ export default function SetupForm({
               {showKey ? "숨기기" : "보기"}
             </button>
           </div>
+          {apiKey && (
+            <p className="mt-2 text-xs text-muted">
+              입력된 키: <span className="font-mono">{describeApiKey(apiKey)}</span>{" "}
+              — 복사가 제대로 됐는지 확인용이며 실제 키 값은 여기에 표시되지 않습니다.
+            </p>
+          )}
           <p className="mt-2 text-xs text-muted">
             이 브라우저에만 저장됩니다. 키가 없으면{" "}
             <a

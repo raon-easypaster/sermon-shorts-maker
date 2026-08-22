@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createJob, runJob } from "@/lib/jobs";
 import { runAnalyze } from "@/lib/pipeline";
+import { sanitizeApiKey } from "@/lib/format";
 
 export const runtime = "nodejs";
 export const maxDuration = 600;
 
 export async function POST(req: NextRequest) {
   const { url, apiKey, targetSec } = await req.json();
-  const key = apiKey || process.env.GEMINI_API_KEY;
+  const key = (apiKey && sanitizeApiKey(apiKey)) || process.env.GEMINI_API_KEY;
 
   if (!url) return NextResponse.json({ error: "링크를 입력하세요." }, { status: 400 });
   if (!key) return NextResponse.json({ error: "Gemini API 키가 필요합니다." }, { status: 400 });

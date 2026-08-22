@@ -4,12 +4,13 @@ import { loadCues } from "@/lib/pipeline";
 import { cuesInRange } from "@/lib/captions";
 import { generateTitle } from "@/lib/gemini";
 import type { Highlight } from "@/lib/types";
+import { sanitizeApiKey } from "@/lib/format";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   const { videoId, startSec, endSec, apiKey } = await req.json();
-  const key = apiKey || process.env.GEMINI_API_KEY;
+  const key = (apiKey && sanitizeApiKey(apiKey)) || process.env.GEMINI_API_KEY;
   const cues = loadCues(videoId);
   if (!cues) return NextResponse.json({ error: "자막 캐시가 없습니다. 다시 분석해 주세요." }, { status: 400 });
 
