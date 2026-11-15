@@ -24,7 +24,9 @@ jobs:
         run: |
           $f = Get-ChildItem dist/SermonShortsMaker-Setup-*.exe | Select-Object -First 1
           if (-not $f) { throw "설치 파일이 없습니다" }
-          (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower() + "  " + $f.Name | Out-File -Encoding ascii dist/SHA256SUMS.txt
+          # 맥·리눅스의 shasum -c 로도 바로 확인되게 줄바꿈은 LF 로
+          $line = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower() + "  " + $f.Name + "`n"
+          [IO.File]::WriteAllText("$PWD/dist/SHA256SUMS.txt", $line, [Text.Encoding]::ASCII)
           Get-Content dist/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
