@@ -32,6 +32,6 @@ if not exist .next\BUILD_ID (
 )
 
 echo 설교 쇼츠 메이커를 시작합니다...
-start "" cmd /c "timeout /t 2 /nobreak >nul & start http://localhost:3939"
+start "" cmd /c "timeout /t 2 /nobreak >nul & start http://127.0.0.1:3939"
 call npm run start
 pause

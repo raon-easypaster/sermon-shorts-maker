@@ -11,7 +11,11 @@ export function rejectForeign(req: NextRequest): NextResponse | null {
   const type = req.headers.get("content-type") || "";
   const no = (msg: string) => NextResponse.json({ error: msg }, { status: 403 });
   if (!LOCAL.test(host)) return no("이 컴퓨터에서만 쓸 수 있습니다.");
-  if (origin) {
+  // 서버는 127.0.0.1 에서만 열리므로(package.json -H 127.0.0.1, 데스크톱 앱도 같음) 다른 기기는 닿지 못한다.
+  // 여기서는 다른 웹사이트가 브라우저를 시켜 보내는 요청(CSRF)과 DNS 재바인딩을 막는다.
+  // 브라우저의 POST 는 언제나 Origin 을 붙이므로 없으면 받지 않는다.
+  if (!origin) return no("허용되지 않은 요청입니다.");
+  {
     let o: URL;
     try {
       o = new URL(origin);

@@ -22,5 +22,5 @@ if [ ! -f .next/BUILD_ID ]; then
 fi
 
 echo "설교 쇼츠 메이커를 시작합니다..."
-( sleep 2 && open "http://localhost:3939" ) &
+( sleep 2 && open "http://127.0.0.1:3939" ) &
 npm run start
