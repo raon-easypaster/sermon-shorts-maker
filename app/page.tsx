@@ -44,7 +44,7 @@ export default function Home() {
     setStep("analyzing");
     setProgress(0);
     try {
-      const res = await analyze(v.url, v.apiKey, v.targetSec, (p, m) => {
+      const res = await analyze(v.url, v.apiKey, v.provider, v.targetSec, (p, m) => {
         setProgress(p);
         setProgressMsg(m);
       });
@@ -143,6 +143,7 @@ export default function Home() {
           setHighlights={setHighlights}
           videoId={analysis.meta.videoId}
           apiKey={setup?.apiKey || ""}
+          provider={setup?.provider || "auto"}
           subtitles={subtitles}
           setSubtitles={setSubtitles}
           onCreate={handleCreate}

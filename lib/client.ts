@@ -19,13 +19,14 @@ async function pollJob<T>(jobId: string, onProgress?: (p: number, msg: string) =
 export async function analyze(
   url: string,
   apiKey: string,
+  provider: string,
   targetSec: number,
   onProgress?: (p: number, msg: string) => void,
 ): Promise<AnalyzeResult> {
   const r = await fetch("/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url, apiKey, targetSec }),
+    body: JSON.stringify({ url, apiKey, provider, targetSec }),
   });
   const data = await r.json();
   if (!r.ok) throw new Error(data.error || "분석 요청 실패");
@@ -59,6 +60,7 @@ export async function addCustomRange(args: {
   startSec: number;
   endSec: number;
   apiKey: string;
+  provider?: string;
 }): Promise<Highlight> {
   const r = await fetch("/api/custom-range", {
     method: "POST",
@@ -68,4 +70,19 @@ export async function addCustomRange(args: {
   const data = await r.json();
   if (!r.ok) throw new Error(data.error || "구간 추가 실패");
   return data.highlight as Highlight;
+}
+
+export interface AiStatusView {
+  claude: { installed: boolean; loggedIn: boolean };
+  codex: { installed: boolean; loggedIn: boolean };
+  gemini: { installed: boolean; loggedIn: boolean };
+  best: "claude" | "codex" | "gemini" | null;
+}
+export async function getAiStatus(force = false): Promise<AiStatusView | null> {
+  try {
+    const r = await fetch(`/api/ai-status${force ? "?force=1" : ""}`);
+    return r.ok ? ((await r.json()) as AiStatusView) : null;
+  } catch {
+    return null;
+  }
 }

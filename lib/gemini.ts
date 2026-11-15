@@ -6,6 +6,25 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import type { Cue } from "./types";
+import { cliGenerate, extractJson, type CliProvider } from "./ai-cli";
+
+// 어떤 AI로 만들지: Gemini API 키, 또는 이 컴퓨터에 로그인된 구독(claude / codex / gemini 명령)
+export interface AiRun {
+  provider: "gemini-api" | CliProvider;
+  apiKey?: string;
+}
+
+// 구독 AI 는 응답 형식(schema)을 강제할 수 없어서, 글로 형식을 알려 주고 JSON 만 받는다.
+function schemaHint(schema: unknown): string {
+  const walk = (x: any): any => {
+    if (!x || typeof x !== "object") return x;
+    const t = String(x.type || "").toLowerCase();
+    if (t === "object") return Object.fromEntries(Object.entries(x.properties || {}).map(([k, v]) => [k, walk(v)]));
+    if (t === "array") return [walk(x.items)];
+    return t === "integer" ? "정수" : t === "number" ? "숫자" : t === "boolean" ? "true/false" : "글";
+  };
+  return JSON.stringify(walk(schema), null, 1);
+}
 
 // Tried in order until one works with the user's key. Newer keys may not have
 // access to older models ("no longer available to new users") and vice versa.
@@ -68,11 +87,18 @@ function fmt(s: number): string {
 }
 
 async function genJson<T>(
-  apiKey: string,
+  run: AiRun,
   prompt: string,
   schema: unknown,
 ): Promise<T> {
-  const ai = client(apiKey);
+  if (run.provider !== "gemini-api") {
+    const text = await cliGenerate(
+      run.provider,
+      `${prompt}\n\n## 답하는 형식\n아래 모양의 JSON 하나만 답하세요. 설명이나 코드 울타리(\`\`\`) 없이 JSON만 출력합니다.\n${schemaHint(schema)}`,
+    );
+    return extractJson<T>(text);
+  }
+  const ai = client(run.apiKey || "");
   return withModelFallback(async (model) => {
     const resp = await ai.models.generateContent({
       model,
@@ -124,7 +150,7 @@ const structureSchema = {
   required: ["centralMessage", "scripture", "sections"],
 };
 
-async function analyzeStructure(apiKey: string, cues: Cue[]): Promise<StructureResult> {
+async function analyzeStructure(run: AiRun, cues: Cue[]): Promise<StructureResult> {
   const prompt = `당신은 한국어 설교를 분석하는 전문가입니다. 아래는 설교 전체의 자동 생성 자막입니다. 각 줄 앞의 [숫자]는 자막 인덱스, (분:초)는 시작 시각입니다.
 
 이 설교의 구조를 분석해 JSON으로 답하세요:
@@ -137,7 +163,7 @@ async function analyzeStructure(apiKey: string, cues: Cue[]): Promise<StructureR
 자막:
 ${numberedTranscript(cues)}`;
 
-  return genJson<StructureResult>(apiKey, prompt, structureSchema);
+  return genJson<StructureResult>(run, prompt, structureSchema);
 }
 
 // ---- Pass 2: highlights ----
@@ -173,11 +199,11 @@ const highlightsSchema = {
 };
 
 export async function analyzeHighlights(
-  apiKey: string,
+  run: AiRun,
   cues: Cue[],
   targetSec: number,
 ): Promise<RawHighlight[]> {
-  const structure = await analyzeStructure(apiKey, cues);
+  const structure = await analyzeStructure(run, cues);
 
   // approx cues for target length (avg cue ~5s)
   const avgCueDur =
@@ -209,7 +235,7 @@ ${numberedTranscript(cues)}
 4. **다양성**: 서로 다른 대지에서 골고루 뽑아 내용이 겹치지 않게 하세요.
 5. 감정적으로나 메시지 면에서 강력한, 청중의 마음을 움직일 구간을 우선하세요.`;
 
-  const result = await genJson<{ highlights: RawHighlight[] }>(apiKey, prompt, highlightsSchema);
+  const result = await genJson<{ highlights: RawHighlight[] }>(run, prompt, highlightsSchema);
   return result.highlights;
 }
 
@@ -225,14 +251,14 @@ const titleSchema = {
 };
 
 export async function generateTitle(
-  apiKey: string,
+  run: AiRun,
   text: string,
 ): Promise<{ titleLine1: string; titleLine2: string; summary: string }> {
   const prompt = `아래는 설교 중 한 구간의 자막입니다. 이 구간을 쇼츠로 만들 때 상단에 넣을 2줄 제목과 1문장 요약을 JSON으로 만들어 주세요. titleLine2가 강조 문구가 되도록 하고, 각 줄은 6~12자로 짧고 강렬하게.
 
 자막:
 ${text}`;
-  return genJson(apiKey, prompt, titleSchema);
+  return genJson(run, prompt, titleSchema);
 }
 
 // Transcription fallback (no captions): send audio to Gemini for timestamped transcript.

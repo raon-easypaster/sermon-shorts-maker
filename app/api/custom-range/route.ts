@@ -5,11 +5,12 @@ import { cuesInRange } from "@/lib/captions";
 import { generateTitle } from "@/lib/gemini";
 import type { Highlight } from "@/lib/types";
 import { sanitizeApiKey } from "@/lib/format";
+import { resolveProvider, type Provider } from "@/lib/ai-cli";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
-  const { videoId, startSec, endSec, apiKey } = await req.json();
+  const { videoId, startSec, endSec, apiKey, provider } = await req.json();
   const key = (apiKey && sanitizeApiKey(apiKey)) || process.env.GEMINI_API_KEY;
   const cues = loadCues(videoId);
   if (!cues) return NextResponse.json({ error: "자막 캐시가 없습니다. 다시 분석해 주세요." }, { status: 400 });
@@ -18,9 +19,10 @@ export async function POST(req: NextRequest) {
   const text = inRange.map((c) => c.text).join(" ");
 
   let title = { titleLine1: "설교 하이라이트", titleLine2: "", summary: text.slice(0, 60) };
-  if (key && text) {
+  if (text) {
     try {
-      title = await generateTitle(key, text);
+      const run = { provider: await resolveProvider({ provider: (provider as Provider) || "auto", apiKey: key || undefined }), apiKey: key || undefined };
+      title = await generateTitle(run, text);
     } catch {
       /* keep default */
     }

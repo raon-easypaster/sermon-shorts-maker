@@ -11,6 +11,7 @@ export default function HighlightList({
   setHighlights,
   videoId,
   apiKey,
+  provider,
   subtitles,
   setSubtitles,
   onCreate,
@@ -21,6 +22,7 @@ export default function HighlightList({
   setHighlights: (h: Highlight[]) => void;
   videoId: string;
   apiKey: string;
+  provider: string;
   subtitles: SubtitleOptions;
   setSubtitles: (s: SubtitleOptions) => void;
   onCreate: (selected: Highlight[]) => void;
@@ -82,7 +84,7 @@ export default function HighlightList({
     }
     setAdding(true);
     try {
-      const h = await addCustomRange({ videoId, startSec: s, endSec: e, apiKey });
+      const h = await addCustomRange({ videoId, startSec: s, endSec: e, apiKey, provider });
       setHighlights([...highlights, h]);
       setCustomStart("");
       setCustomEnd("");

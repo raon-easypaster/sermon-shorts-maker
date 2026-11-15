@@ -5,9 +5,11 @@ import { loadSetting, saveSetting } from "@/lib/settings";
 import type { TemplateId } from "@/lib/types";
 import { TEMPLATES } from "@/lib/layout";
 import { sanitizeApiKey, describeApiKey } from "@/lib/format";
+import { getAiStatus, type AiStatusView } from "@/lib/client";
 
 export interface SetupValues {
   apiKey: string;
+  provider: string; // auto | claude | codex | gemini | gemini-api
   url: string;
   targetSec: number;
   template: TemplateId;
@@ -17,6 +19,21 @@ export interface SetupValues {
 
 // Generous enough for a logo, small enough to keep in localStorage/JSON body.
 const MAX_LOGO_BYTES = 1_500_000;
+
+const AI_OPTIONS = [
+  { id: "auto", label: "자동" },
+  { id: "claude", label: "Claude 구독" },
+  { id: "codex", label: "ChatGPT 구독" },
+  { id: "gemini", label: "Gemini 구독" },
+  { id: "gemini-api", label: "Gemini API 키" },
+];
+const AI_NAME = { claude: "Claude", codex: "ChatGPT(Codex)", gemini: "Gemini" } as const;
+const INSTALL = {
+  claude: "curl -fsSL https://claude.ai/install.sh | bash",
+  codex: "npm install -g @openai/codex",
+  gemini: "npm install -g @google/gemini-cli",
+} as const;
+const LOGIN = { claude: "claude", codex: "codex login", gemini: "gemini" } as const;
 
 const TARGETS = [
   { sec: 30, label: "30초" },
@@ -40,6 +57,18 @@ export default function SetupForm({
   const [churchLogo, setChurchLogo] = useState("");
   const [logoError, setLogoError] = useState("");
   const [showKey, setShowKey] = useState(false);
+  const [provider, setProvider] = useState("auto");
+  const [ai, setAi] = useState<AiStatusView | null>(null);
+  const [checking, setChecking] = useState(false);
+  const recheck = async () => {
+    setChecking(true);
+    setAi(await getAiStatus(true));
+    setChecking(false);
+  };
+  useEffect(() => {
+    void getAiStatus().then(setAi);
+    void loadSetting("ai_provider").then((p) => p && setProvider(p));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,9 +118,11 @@ export default function SetupForm({
     if (!url.trim()) return;
     const cleanKey = sanitizeApiKey(apiKey);
     void saveSetting("gemini_api_key", cleanKey);
+    void saveSetting("ai_provider", provider);
     void saveSetting("church_name", churchName.trim());
     onSubmit({
       apiKey: cleanKey,
+      provider,
       url: url.trim(),
       targetSec,
       template,
@@ -115,8 +146,54 @@ export default function SetupForm({
       </div>
 
       <div className="rounded-2xl border border-line bg-panel p-6 shadow-xl sm:p-8">
+        {/* AI */}
+        <Field n={1} label="AI 선택">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {AI_OPTIONS.map((o) => {
+              const st = o.id === "auto" || o.id === "gemini-api" ? null : ai?.[o.id as "claude" | "codex" | "gemini"];
+              const note =
+                o.id === "auto"
+                  ? ai?.best ? `지금: ${AI_NAME[ai.best]}` : ai ? "로그인된 구독 없음 → API 키" : ""
+                  : o.id === "gemini-api"
+                    ? "무료·유료 키"
+                    : !ai ? "" : st?.loggedIn ? "✓ 로그인됨" : st?.installed ? "로그인 필요" : "설치 필요";
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => setProvider(o.id)}
+                  className={`rounded-xl border px-3 py-2 text-left transition ${
+                    provider === o.id ? "border-accent bg-accent/15" : "border-line bg-panel2 hover:border-accent/50"
+                  }`}
+                >
+                  <div className="font-bold">{o.label}</div>
+                  <div className={`text-xs ${st && !st.loggedIn ? "text-amber-400" : "text-muted"}`}>{note}</div>
+                </button>
+              );
+            })}
+          </div>
+          {(() => {
+            const id = provider as "claude" | "codex" | "gemini";
+            const st = ai?.[id];
+            if (!["claude", "codex", "gemini"].includes(provider) || !ai || st?.loggedIn) return null;
+            return (
+              <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                <p className="font-bold">{AI_NAME[id]}을(를) 쓰려면 이 컴퓨터에서 한 번 로그인해 주세요.</p>
+                <p className="mt-1 text-muted">터미널(맥: 응용 프로그램 → 유틸리티 → 터미널)을 열고 아래를 입력한 뒤, 안내에 따라 유료 구독 계정으로 로그인합니다.</p>
+                {!st?.installed && <code className="mt-2 block rounded bg-black/40 px-2 py-1 font-mono">{INSTALL[id]}</code>}
+                <code className="mt-2 block rounded bg-black/40 px-2 py-1 font-mono">{LOGIN[id]}</code>
+                {id === "gemini" && <p className="mt-1 text-xs text-muted">처음 실행하면 나오는 화면에서 &quot;Login with Google&quot;을 고르고, Google AI Pro·Ultra 구독 계정으로 로그인하세요. 끝나면 /quit 로 나옵니다.</p>}
+                <button type="button" onClick={recheck} className="mt-2 text-accent underline">{checking ? "확인 중..." : "로그인했어요 — 다시 확인"}</button>
+              </div>
+            );
+          })()}
+          <p className="mt-2 text-xs text-muted">
+            구독 AI는 이 컴퓨터에 로그인된 Claude·ChatGPT·Gemini 유료 구독 사용량으로 돌아가며 API 요금이 따로 들지 않습니다. 자막 글만 AI로 보내고 영상은 보내지 않습니다.
+          </p>
+        </Field>
+
         {/* API key */}
-        <Field n={1} label="Gemini API 키" hint={savedKey ? "✓ 저장됨" : undefined}>
+        <Field n={2} label={provider === "gemini-api" ? "Gemini API 키" : "Gemini API 키 (선택)"} hint={savedKey && apiKey ? "✓ 저장됨" : undefined}>
           <div className="relative">
             <input
               type={showKey ? "text" : "password"}
@@ -143,6 +220,7 @@ export default function SetupForm({
             </p>
           )}
           <p className="mt-2 text-xs text-muted">
+            {provider !== "gemini-api" && "구독 AI를 쓰면 없어도 됩니다. 유튜브 자막이 없는 영상을 받아 적을 때만 쓰입니다. "}
             이 브라우저에만 저장됩니다. 키가 없으면{" "}
             <a
               href="https://aistudio.google.com/apikey"
@@ -157,7 +235,7 @@ export default function SetupForm({
         </Field>
 
         {/* URL */}
-        <Field n={2} label="설교 유튜브 링크">
+        <Field n={3} label="설교 유튜브 링크">
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -170,7 +248,7 @@ export default function SetupForm({
         </Field>
 
         {/* target length */}
-        <Field n={3} label="쇼츠 길이">
+        <Field n={4} label="쇼츠 길이">
           <div className="grid grid-cols-3 gap-2">
             {TARGETS.map((t) => (
               <button
@@ -189,7 +267,7 @@ export default function SetupForm({
         </Field>
 
         {/* template */}
-        <Field n={4} label="템플릿 (스타일)">
+        <Field n={5} label="템플릿 (스타일)">
           <div className="grid grid-cols-2 gap-3">
             {(Object.keys(TEMPLATES) as TemplateId[]).map((id) => (
               <TemplateSwatch
@@ -203,7 +281,7 @@ export default function SetupForm({
         </Field>
 
         {/* church name + logo watermark */}
-        <Field n={5} label="교회명 · 로고 (선택)">
+        <Field n={6} label="교회명 · 로고 (선택)">
           <input
             value={churchName}
             onChange={(e) => setChurchName(e.target.value)}

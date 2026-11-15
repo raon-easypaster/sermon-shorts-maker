@@ -9,7 +9,8 @@ import {
   fetchAudio,
   fetchVideo,
 } from "./ytdlp";
-import { analyzeHighlights } from "./gemini";
+import { analyzeHighlights, type AiRun } from "./gemini";
+import { AiError, PROVIDER_LABEL, resolveProvider, type AiChoice } from "./ai-cli";
 import { transcribeAudio } from "./gemini";
 import { prepareSpeechChunks, cleanupChunks } from "./audio";
 import { detectSilence } from "./silence";
@@ -21,12 +22,15 @@ type Progress = (p: number, msg?: string) => void;
 
 export async function runAnalyze(
   url: string,
-  apiKey: string,
+  choice: AiChoice,
   targetSec: number,
   progress: Progress,
 ): Promise<AnalyzeResult> {
   const videoId = extractVideoId(url);
   if (!videoId) throw new Error("유효한 유튜브 링크가 아닙니다.");
+
+  const run: AiRun = { provider: await resolveProvider(choice), apiKey: choice.apiKey };
+  const label = PROVIDER_LABEL[run.provider];
 
   progress(0.05, "영상 정보를 가져오는 중...");
   const meta = await fetchMeta(url);
@@ -37,6 +41,12 @@ export async function runAnalyze(
 
   if (!cues || cues.length < 5) {
     hasCaptions = false;
+    // 음성을 글로 바꾸는 일은 Gemini API 만 할 수 있다 (구독 AI 명령줄 도구는 소리 파일을 받지 못함)
+    if (!choice.apiKey) {
+      throw new AiError(
+        "이 영상에는 유튜브 자막(자동 자막 포함)이 없습니다. 자막 없는 영상은 음성을 받아 적어야 해서 Gemini API 키가 필요합니다. 유튜브가 자동 자막을 만들 때까지(보통 업로드 몇 시간 뒤) 기다렸다가 다시 하시거나, Gemini API 키를 넣어 주세요.",
+      );
+    }
     progress(0.3, "자막이 없어 음성을 인식하는 중... (조금 더 걸려요)");
     const audioPath = await fetchAudio(url, videoId);
     const chunks = await prepareSpeechChunks(audioPath, videoId);
@@ -51,7 +61,7 @@ export async function runAnalyze(
           `음성을 인식하는 중... (${i + 1}/${chunks.length})`,
         );
         const buf = fs.readFileSync(chunks[i].file);
-        const part = await transcribeAudio(apiKey, buf.toString("base64"), "audio/mpeg");
+        const part = await transcribeAudio(choice.apiKey, buf.toString("base64"), "audio/mpeg");
         for (const c of part) {
           all.push({
             start: c.start + chunks[i].offsetSec,
@@ -67,8 +77,8 @@ export async function runAnalyze(
   }
   if (!cues || cues.length < 3) throw new Error("자막·음성 인식에 실패했습니다.");
 
-  progress(0.55, "AI가 하이라이트를 분석하는 중...");
-  const raw = await analyzeHighlights(apiKey, cues, targetSec);
+  progress(0.55, `AI(${label})가 하이라이트를 분석하는 중... (1~3분)`);
+  const raw = await analyzeHighlights(run, cues, targetSec);
 
   progress(0.8, "구간 경계를 다듬는 중...");
   // silence detection needs local audio; reuse captions timing primarily,
