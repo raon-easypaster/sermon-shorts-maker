@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rejectForeign } from "@/lib/guard";
 import { createJob, runJob } from "@/lib/jobs";
 import { runAnalyze } from "@/lib/pipeline";
 import { sanitizeApiKey } from "@/lib/format";
@@ -10,6 +11,8 @@ export const maxDuration = 600;
 const PROVIDERS: Provider[] = ["auto", "gemini-api", "claude", "codex", "gemini"];
 
 export async function POST(req: NextRequest) {
+  const denied = rejectForeign(req);
+  if (denied) return denied;
   const { url, apiKey, targetSec, provider } = await req.json();
   const key = (apiKey && sanitizeApiKey(apiKey)) || process.env.GEMINI_API_KEY || "";
   const p: Provider = PROVIDERS.includes(provider) ? provider : "auto";

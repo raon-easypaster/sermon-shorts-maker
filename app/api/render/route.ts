@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { rejectForeign } from "@/lib/guard";
 import { createJob, runJob } from "@/lib/jobs";
 import { fetchVideo } from "@/lib/pipeline";
 import { renderHighlight, writeChurchLogo } from "@/lib/render";
@@ -17,6 +18,8 @@ function styleTag(o: unknown): string {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = rejectForeign(req);
+  if (denied) return denied;
   const body = (await req.json()) as RenderRequest & { url: string };
   const { url, videoId, highlight, template, churchName, churchLogo } = body;
   if (!url || !videoId || !highlight) {

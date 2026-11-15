@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rejectForeign } from "@/lib/guard";
 import { randomUUID } from "node:crypto";
 import { loadCues } from "@/lib/pipeline";
 import { cuesInRange } from "@/lib/captions";
@@ -10,6 +11,8 @@ import { resolveProvider, type Provider } from "@/lib/ai-cli";
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  const denied = rejectForeign(req);
+  if (denied) return denied;
   const { videoId, startSec, endSec, apiKey, provider } = await req.json();
   const key = (apiKey && sanitizeApiKey(apiKey)) || process.env.GEMINI_API_KEY;
   const cues = loadCues(videoId);

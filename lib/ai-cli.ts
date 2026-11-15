@@ -19,7 +19,6 @@ export const PROVIDER_LABEL: Record<CliProvider | "gemini-api", string> = {
 
 const WIN = process.platform === "win32";
 const HOME = os.homedir();
-const WORK_DIR = path.join(os.tmpdir(), "sermon-shorts-ai");
 const TIMEOUT = 10 * 60 * 1000;
 
 // 데스크톱 앱·허브에서 켜면 PATH 가 짧을 수 있어 흔한 설치 위치를 더한다.
@@ -45,8 +44,8 @@ function findWin(cmd: string): string | null {
 }
 const q = (a: string) => (a === "" || /[\s"&|<>^()%!]/.test(a) ? `"${a.replace(/"/g, '""')}"` : a);
 
-function spawnCli(cmd: string, args: string[]): ChildProcess {
-  const opts = { cwd: WORK_DIR, env: { ...process.env, PATH: CLI_PATH } };
+function spawnCli(cmd: string, args: string[], cwd: string): ChildProcess {
+  const opts = { cwd, env: { ...process.env, PATH: CLI_PATH } };
   if (!WIN) return spawn(cmd, args, opts);
   const file = findWin(cmd);
   if (!file) throw Object.assign(new Error(`${cmd} not found`), { code: "ENOENT" });
@@ -58,13 +57,35 @@ function spawnCli(cmd: string, args: string[]): ChildProcess {
   });
 }
 
-function run(cmd: string, args: string[], input: string | null, timeout: number): Promise<{ code: number | null; out: string; err: string }> {
-  fs.mkdirSync(WORK_DIR, { recursive: true });
+// 실행할 때마다 나만 쓰는 빈 폴더를 새로 만들고(0700), 끝나면 지운다.
+// 다른 사용자가 미리 만들어 둔 폴더의 설정 파일을 AI 도구가 읽는 일이 없게.
+function freshDir(): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), "sermon-shorts-ai-"));
+}
+
+async function run(
+  cmd: string,
+  args: string[] | ((dir: string) => string[]),
+  input: string | null,
+  timeout: number,
+  after?: (dir: string) => void,
+): Promise<{ code: number | null; out: string; err: string }> {
+  const dir = freshDir();
+  try {
+    const r = await runIn(dir, cmd, typeof args === "function" ? args(dir) : args, input, timeout);
+    after?.(dir);
+    return r;
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function runIn(dir: string, cmd: string, args: string[], input: string | null, timeout: number): Promise<{ code: number | null; out: string; err: string }> {
   return new Promise((resolve, reject) => {
     let child: ChildProcess;
     const missing = () => new AiError(`${cmd} 프로그램이 이 컴퓨터에 없습니다.`, "missing");
     try {
-      child = spawnCli(cmd, args);
+      child = spawnCli(cmd, args, dir);
     } catch (e) {
       reject((e as { code?: string }).code === "ENOENT" ? missing() : e);
       return;
@@ -174,16 +195,20 @@ async function withClaude(prompt: string): Promise<string> {
 }
 
 async function withCodex(prompt: string): Promise<string> {
-  fs.mkdirSync(WORK_DIR, { recursive: true });
-  const outFile = path.join(WORK_DIR, `codex-${process.pid}-${Date.now()}.txt`);
-  const r = await run("codex", ["exec", "--skip-git-repo-check", "--ephemeral", "-s", "read-only", "-o", outFile, "-"], prompt, TIMEOUT);
   let text = "";
-  try {
-    text = fs.readFileSync(outFile, "utf8");
-    fs.unlinkSync(outFile);
-  } catch {
-    /* 없음 */
-  }
+  const r = await run(
+    "codex",
+    (dir) => ["exec", "--skip-git-repo-check", "--ephemeral", "-s", "read-only", "-c", "tools.web_search=false", "-C", dir, "-o", path.join(dir, "answer.txt"), "-"],
+    prompt,
+    TIMEOUT,
+    (dir) => {
+      try {
+        text = fs.readFileSync(path.join(dir, "answer.txt"), "utf8");
+      } catch {
+        /* 없음 */
+      }
+    },
+  );
   if (r.code === 0 && text.trim()) return text;
   const last = (r.err.match(/"message":"([^"]+)"/) || [])[1] || r.err.trim().split("\n").pop() || `종료 코드 ${r.code}`;
   if (/not logged in|unauthorized|login/i.test(last)) throw new AiError("ChatGPT(Codex)에 로그인되어 있지 않습니다. 터미널에서 codex login 을 실행해 주세요.", "login");
@@ -193,7 +218,8 @@ async function withCodex(prompt: string): Promise<string> {
 
 async function withGemini(prompt: string): Promise<string> {
   // 글은 표준입력으로, -p 는 비대화(headless) 실행 표시용. 도구는 쓰지 않는다(plan = 읽기 전용).
-  const r = await run("gemini", ["-p", " ", "-o", "json", "--approval-mode", "plan"], prompt, TIMEOUT);
+  // plan = 읽기 전용, 확장·MCP 서버는 끄고, 빈 폴더에서 실행 (읽을 파일이 없게)
+  const r = await run("gemini", ["-p", " ", "-o", "json", "--approval-mode", "plan", "-e", "none", "--allowed-mcp-server-names", "__none__"], prompt, TIMEOUT);
   const start = r.out.indexOf("{");
   let j: { response?: string; error?: { message?: string } } | null = null;
   try {
