@@ -31,3 +31,20 @@ describe("이 컴퓨터의 화면에서 온 요청만", () => {
     expect(rejectForeign(req({ host: "127.0.0.1:3939", origin: "http://127.0.0.1:3939", "content-type": "text/plain" }))?.status).toBe(415);
   });
 });
+
+import { agyArgs } from "@/lib/ai-cli";
+describe("Gemini 구독(Antigravity) 실행 방식", () => {
+  it("읽기 전용(plan)·샌드박스로 돌리고, plan 을 꺼 버리는 --disable-slash-commands 는 넣지 않는다", () => {
+    const { args, file } = agyArgs("[안내] 자막...", false);
+    expect(args).toEqual(expect.arrayContaining(["--mode", "plan", "--sandbox"]));
+    expect(args).not.toContain("--disable-slash-commands");
+    expect(args[1]).toBe("[안내] 자막...");   // 맥: 글을 바로 실어 보냄 (파일 읽기 불필요)
+    expect(file).toBeUndefined();
+  });
+  it("윈도우에서 긴 글만 파일로 넘긴다 (명령줄 길이 제한)", () => {
+    const long = "가".repeat(30_000);
+    expect(agyArgs(long, true).file).toBe(long);
+    expect(agyArgs(long, true).args[1]).toContain("request.txt");
+    expect(agyArgs("짧은 글", true).file).toBeUndefined();
+  });
+});

@@ -225,18 +225,32 @@ async function withCodex(prompt: string): Promise<string> {
 // 그래서 Antigravity CLI(agy)가 있으면 그것을 쓰고, 없을 때만 예전 gemini 명령을 쓴다.
 const AGY_MODEL = process.env.AGY_MODEL || "gemini-3.8-flash-high";
 
+/** agy 실행 인자 (시험에서 확인). file 이 있으면 작업 폴더의 request.txt 로 넘긴다. */
+export function agyArgs(prompt: string, win: boolean): { args: string[]; file?: string } {
+  const inline = !win || prompt.length < 20_000;
+  return {
+    args: [
+      "-p",
+      inline ? prompt : "이 작업 폴더의 request.txt 파일에 할 일이 적혀 있습니다. 그 파일만 읽고, 거기 적힌 대로 답하세요. 다른 파일·명령·검색은 쓰지 마세요.",
+      "--output-format", "json", "--mode", "plan", "--sandbox", "--model", AGY_MODEL, "--print-timeout", `${Math.round(TIMEOUT / 1000)}s`,
+    ],
+    file: inline ? undefined : prompt,
+  };
+}
+
 async function withAgy(prompt: string): Promise<string> {
-  // 윈도우 명령줄 길이 제한(약 3만 자) 때문에 긴 자막은 작업 폴더의 파일로 넘긴다.
-  // 작업 폴더는 이번 실행만 쓰는 빈 임시 폴더이고, plan(읽기 전용) 모드로 돌린다.
+  // agy 에는 도구를 모두 끄는 옵션이 없어서 위험을 줄이는 쪽으로 돌린다:
+  //  - plan(읽기 전용) + --sandbox(터미널 제한), 작업 폴더는 이번 실행만 쓰는 빈 임시 폴더
+  //  - 글은 되도록 명령에 바로 실어 보낸다 → AI 가 파일을 읽을 필요 자체가 없게.
+  //    윈도우는 명령줄 길이 제한(약 3만 자)이 있어 긴 자막만 작업 폴더의 파일로 넘긴다.
+  //  - --disable-slash-commands 는 쓰지 않는다: 함께 쓰면 plan 모드가 꺼진다(agy 1.4 경고).
+  //    보내는 글은 '[안내]'로 시작해 슬래시 명령으로 해석될 일이 없다.
+  const a = agyArgs(prompt, WIN);
   const r = await run(
     "agy",
     (dir) => {
-      fs.writeFileSync(path.join(dir, "request.txt"), prompt);
-      return [
-        "-p",
-        "이 작업 폴더의 request.txt 파일에 할 일이 적혀 있습니다. 그 파일만 읽고, 거기 적힌 대로 답하세요. 다른 파일·명령·검색은 쓰지 마세요.",
-        "--output-format", "json", "--mode", "plan", "--model", AGY_MODEL, "--print-timeout", `${Math.round(TIMEOUT / 1000)}s`, "--disable-slash-commands",
-      ];
+      if (a.file) fs.writeFileSync(path.join(dir, "request.txt"), a.file);
+      return a.args;
     },
     null,
     TIMEOUT + 30_000,
