@@ -41,10 +41,12 @@ describe("Gemini 구독(Antigravity) 실행 방식", () => {
     expect(args[1]).toBe("[안내] 자막...");   // 맥: 글을 바로 실어 보냄 (파일 읽기 불필요)
     expect(file).toBeUndefined();
   });
-  it("윈도우에서 긴 글만 파일로 넘긴다 (명령줄 길이 제한)", () => {
-    const long = "가".repeat(30_000);
-    expect(agyArgs(long, true).file).toBe(long);
-    expect(agyArgs(long, true).args[1]).toContain("request.txt");
-    expect(agyArgs("짧은 글", true).file).toBeUndefined();
+  it("윈도우에서는 짧은 글도 언제나 파일로 (cmd.exe 명령 주입 막기)", () => {
+    for (const t of ["가".repeat(30_000), "짧은 글", '100% "따옴표" & 줄\n바꿈']) {
+      const a = agyArgs(t, true);
+      expect(a.file).toBe(t);
+      expect(a.args.join(" ")).not.toContain(t);
+      expect(a.args[1]).toContain("request.txt");
+    }
   });
 });

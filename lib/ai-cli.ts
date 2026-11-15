@@ -227,7 +227,9 @@ const AGY_MODEL = process.env.AGY_MODEL || "gemini-3.8-flash-high";
 
 /** agy 실행 인자 (시험에서 확인). file 이 있으면 작업 폴더의 request.txt 로 넘긴다. */
 export function agyArgs(prompt: string, win: boolean): { args: string[]; file?: string } {
-  const inline = !win || prompt.length < 20_000;
+  // 윈도우에서는 언제나 파일로: agy 가 .cmd 로 깔리면 cmd.exe 를 거치는데, 자막 글의 % ! 줄바꿈 등이
+  // 명령으로 해석될 수 있다(명령 주입). 명령줄에는 우리가 정한 고정 글만 싣는다.
+  const inline = !win;
   return {
     args: [
       "-p",
@@ -242,7 +244,7 @@ async function withAgy(prompt: string): Promise<string> {
   // agy 에는 도구를 모두 끄는 옵션이 없어서 위험을 줄이는 쪽으로 돌린다:
   //  - plan(읽기 전용) + --sandbox(터미널 제한), 작업 폴더는 이번 실행만 쓰는 빈 임시 폴더
   //  - 글은 되도록 명령에 바로 실어 보낸다 → AI 가 파일을 읽을 필요 자체가 없게.
-  //    윈도우는 명령줄 길이 제한(약 3만 자)이 있어 긴 자막만 작업 폴더의 파일로 넘긴다.
+  //    윈도우는 명령 주입·길이 제한 때문에 언제나 작업 폴더의 파일로 넘긴다.
   //  - --disable-slash-commands 는 쓰지 않는다: 함께 쓰면 plan 모드가 꺼진다(agy 1.4 경고).
   //    보내는 글은 '[안내]'로 시작해 슬래시 명령으로 해석될 일이 없다.
   const a = agyArgs(prompt, WIN);
