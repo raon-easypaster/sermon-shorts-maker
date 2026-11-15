@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`자막 읽기 > 단어를 자막 줄로 묶는다 (1초 넘게 쉬거나 7단어가 되면 끊음) 1`] = `
+[
+  {
+    "end": 4,
+    "start": 1,
+    "text": "오늘 우리가 함께 볼 말씀은 요한복음 15장",
+  },
+  {
+    "end": 5.2,
+    "start": 4,
+    "text": "말씀입니다",
+  },
+  {
+    "end": 9.299999999999999,
+    "start": 8,
+    "text": "&gt;&gt; 아멘 [음악]",
+  },
+]
+`;

@@ -1,0 +1,92 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`배치와 자막 파일 > 배치 값 전체가 그대로다 1`] = `
+{
+  "SUB_FONT_SIZE": {
+    "large": 70,
+    "medium": 58,
+    "small": 46,
+    "xlarge": 84,
+  },
+  "TEMPLATES": {
+    "dark": {
+      "bg": "#000000",
+      "id": "dark",
+      "label": "기본 (다크)",
+      "subtitle": "#FFFFFF",
+      "subtitleOutline": "#000000",
+      "titleLine1": "#FFFFFF",
+      "titleLine2": "#FFFF5A",
+    },
+    "light": {
+      "bg": "#F2EEE6",
+      "id": "light",
+      "label": "라이트",
+      "subtitle": "#1B243D",
+      "subtitleOutline": "#F2EEE6",
+      "titleLine1": "#1B243D",
+      "titleLine2": "#C1392B",
+    },
+  },
+  "TITLE": {
+    "centerX": 540,
+    "fontSize": 116,
+    "line1CenterY": 242,
+    "line2CenterY": 357,
+    "maxTextWidth": 900,
+    "minFontSize": 56,
+  },
+  "TITLE_FONT_SIZE": {
+    "large": 142,
+    "medium": 116,
+    "small": 88,
+    "xlarge": 168,
+  },
+  "titles": [
+    {
+      "fontSize": 88,
+      "line1CenterY": 256,
+      "line2CenterY": 343,
+    },
+    {
+      "fontSize": 116,
+      "line1CenterY": 242,
+      "line2CenterY": 357,
+    },
+    {
+      "fontSize": 142,
+      "line1CenterY": 229,
+      "line2CenterY": 370,
+    },
+    {
+      "fontSize": 168,
+      "line1CenterY": 216,
+      "line2CenterY": 383,
+    },
+  ],
+}
+`;
+
+exports[`배치와 자막 파일 > 자막 파일: 자동 줄바꿈(WrapStyle 0), 화면 크기, 제목·자막 모두 한 파일에 1`] = `
+"[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Title,Pretendard ExtraBold,116,&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1
+Style: TitleAccent,Pretendard ExtraBold,116,&H005AFFFF,&H005AFFFF,&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1
+Style: Sub,Pretendard,70,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,1,0,0,0,100,100,0,0,1,4,1,2,80,80,190,1
+Style: Watermark,Pretendard,42,&H40FFFFFF,&H40FFFFFF,&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,0,0,9,0,0,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:40.00,Title,,0,0,0,,{\\an5\\pos(540,242)}하나님 없이 가느니
+Dialogue: 0,0:00:00.00,0:00:40.00,TitleAccent,,0,0,0,,{\\an5\\pos(540,357)\\fscx83\\fscy83}차라리 가지 않겠습니다
+Dialogue: 0,0:00:00.00,0:00:40.00,Watermark,,0,0,0,,{\\an9\\pos(1024,78)}예제교회
+Dialogue: 0,0:00:00.50,0:00:02.00,Sub,,0,0,0,,목적지보다 중요한 것은
+"
+`;

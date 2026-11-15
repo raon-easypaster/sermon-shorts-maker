@@ -12,6 +12,7 @@ export default function HighlightList({
   videoId,
   apiKey,
   provider,
+  mode,
   subtitles,
   setSubtitles,
   onCreate,
@@ -23,6 +24,7 @@ export default function HighlightList({
   videoId: string;
   apiKey: string;
   provider: string;
+  mode: "sermon" | "praise";
   subtitles: SubtitleOptions;
   setSubtitles: (s: SubtitleOptions) => void;
   onCreate: (selected: Highlight[]) => void;
@@ -84,7 +86,7 @@ export default function HighlightList({
     }
     setAdding(true);
     try {
-      const h = await addCustomRange({ videoId, startSec: s, endSec: e, apiKey, provider });
+      const h = await addCustomRange({ videoId, startSec: s, endSec: e, apiKey, provider, mode });
       setHighlights([...highlights, h]);
       setCustomStart("");
       setCustomEnd("");
@@ -178,6 +180,7 @@ export default function HighlightList({
       <div className="mt-8 rounded-2xl border border-line bg-panel p-5">
         <SubtitleControls value={subtitles} onChange={setSubtitles} />
         <p className="mt-3 text-xs text-muted">
+          {mode === "praise" && "찬양 가사 자막은 유튜브 자동 자막이라 틀린 글자가 많아 처음엔 꺼 두었습니다. 켜면 그대로 들어갑니다. "}
           만든 뒤에도 영상별로 자막·제목을 다시 고칠 수 있어요.
         </p>
       </div>

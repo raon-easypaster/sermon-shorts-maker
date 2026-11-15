@@ -9,7 +9,7 @@ import {
   fetchAudio,
   fetchVideo,
 } from "./ytdlp";
-import { analyzeHighlights, type AiRun } from "./gemini";
+import { analyzeHighlights, analyzePraise, type AiRun, type ShortsMode } from "./gemini";
 import { AiError, PROVIDER_LABEL, resolveProvider, type AiChoice } from "./ai-cli";
 import { transcribeAudio } from "./gemini";
 import { prepareSpeechChunks, cleanupChunks } from "./audio";
@@ -25,6 +25,7 @@ export async function runAnalyze(
   choice: AiChoice,
   targetSec: number,
   progress: Progress,
+  mode: ShortsMode = "sermon",
 ): Promise<AnalyzeResult> {
   const videoId = extractVideoId(url);
   if (!videoId) throw new Error("유효한 유튜브 링크가 아닙니다.");
@@ -77,8 +78,11 @@ export async function runAnalyze(
   }
   if (!cues || cues.length < 3) throw new Error("자막·음성 인식에 실패했습니다.");
 
-  progress(0.55, `AI(${label})가 하이라이트를 분석하는 중... (1~3분)`);
-  const raw = await analyzeHighlights(run, cues, targetSec);
+  progress(0.55, mode === "praise" ? `AI(${label})가 찬양 곡을 찾는 중... (1~3분)` : `AI(${label})가 하이라이트를 분석하는 중... (1~3분)`);
+  const raw = mode === "praise" ? await analyzePraise(run, cues, targetSec) : await analyzeHighlights(run, cues, targetSec);
+  if (mode === "praise" && raw.length === 0) {
+    throw new Error("이 영상에서 찬양 부분을 찾지 못했습니다. 유튜브 자동 자막에 노래 가사가 잡히지 않았을 수 있습니다. 다음 화면의 '구간 직접 추가'로 찬양 시작·끝 시간을 넣어 만들어 주세요.");
+  }
 
   progress(0.8, "구간 경계를 다듬는 중...");
   // silence detection needs local audio; reuse captions timing primarily,
@@ -142,7 +146,7 @@ export async function runAnalyze(
   cacheCues(videoId, cues);
 
   progress(1, "완료");
-  return { meta, highlights, hasCaptions };
+  return { meta, highlights, hasCaptions, mode };
 }
 
 // simple cue cache on disk keyed by videoId

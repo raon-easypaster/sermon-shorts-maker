@@ -47,7 +47,9 @@ export default function Home() {
       const res = await analyze(v.url, v.apiKey, v.provider, v.targetSec, (p, m) => {
         setProgress(p);
         setProgressMsg(m);
-      });
+      }, v.mode);
+      // 찬양 가사는 자동 자막이라 틀리기 쉬워서 처음엔 자막을 꺼 둔다 (켜면 그대로 나옴)
+      setSubtitles((s) => ({ ...s, enabled: v.mode !== "praise" }));
       setAnalysis(res);
       setHighlights(res.highlights);
       setStep("select");
@@ -144,6 +146,7 @@ export default function Home() {
           videoId={analysis.meta.videoId}
           apiKey={setup?.apiKey || ""}
           provider={setup?.provider || "auto"}
+          mode={setup?.mode || "sermon"}
           subtitles={subtitles}
           setSubtitles={setSubtitles}
           onCreate={handleCreate}

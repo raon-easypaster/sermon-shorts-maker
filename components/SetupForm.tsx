@@ -10,6 +10,7 @@ import { getAiStatus, type AiStatusView } from "@/lib/client";
 export interface SetupValues {
   apiKey: string;
   provider: string; // auto | claude | codex | gemini | gemini-api
+  mode: "sermon" | "praise";
   url: string;
   targetSec: number;
   template: TemplateId;
@@ -28,12 +29,13 @@ const AI_OPTIONS = [
   { id: "gemini-api", label: "Gemini API 키" },
 ];
 const AI_NAME = { claude: "Claude", codex: "ChatGPT(Codex)", gemini: "Gemini" } as const;
+const IS_WIN = typeof navigator !== "undefined" && /Win/i.test(navigator.platform || navigator.userAgent);
 const INSTALL = {
-  claude: "curl -fsSL https://claude.ai/install.sh | bash",
+  claude: IS_WIN ? "irm https://claude.ai/install.ps1 | iex" : "curl -fsSL https://claude.ai/install.sh | bash",
   codex: "npm install -g @openai/codex",
-  gemini: "npm install -g @google/gemini-cli",
+  gemini: "Antigravity 앱 설치: https://antigravity.google (설치하면 agy 명령이 함께 생김)",
 } as const;
-const LOGIN = { claude: "claude", codex: "codex login", gemini: "gemini" } as const;
+const LOGIN = { claude: "claude", codex: "codex login", gemini: "agy" } as const;
 
 const TARGETS = [
   { sec: 30, label: "30초" },
@@ -58,6 +60,7 @@ export default function SetupForm({
   const [logoError, setLogoError] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [provider, setProvider] = useState("auto");
+  const [mode, setMode] = useState<"sermon" | "praise">("sermon");
   const [ai, setAi] = useState<AiStatusView | null>(null);
   const [checking, setChecking] = useState(false);
   const recheck = async () => {
@@ -68,6 +71,7 @@ export default function SetupForm({
   useEffect(() => {
     void getAiStatus().then(setAi);
     void loadSetting("ai_provider").then((p) => p && setProvider(p));
+    void loadSetting("shorts_mode").then((m) => (m === "praise" || m === "sermon") && setMode(m));
   }, []);
 
   useEffect(() => {
@@ -119,10 +123,12 @@ export default function SetupForm({
     const cleanKey = sanitizeApiKey(apiKey);
     void saveSetting("gemini_api_key", cleanKey);
     void saveSetting("ai_provider", provider);
+    void saveSetting("shorts_mode", mode);
     void saveSetting("church_name", churchName.trim());
     onSubmit({
       apiKey: cleanKey,
       provider,
+      mode,
       url: url.trim(),
       targetSec,
       template,
@@ -133,16 +139,31 @@ export default function SetupForm({
 
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <div className="mb-10 text-center">
+      <div className="mb-8 text-center">
         <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">
-          설교 전체 영상을
+          {mode === "praise" ? "예배 영상의 찬양을" : "설교 전체 영상을"}
           <br />
           <span className="text-accent">쇼츠 영상</span>으로
         </h1>
         <p className="mt-4 text-muted">
-          설교(예배) 유튜브 링크를 넣으면 AI가 하이라이트를 찾아
-          <br className="hidden sm:block" /> 쇼츠를 만들어 드립니다 (자막 on/off 가능).
+          {mode === "praise" ? (
+            <>예배(찬양) 유튜브 링크를 넣으면 AI가 부른 곡들을 찾아<br className="hidden sm:block" /> 곡마다 후렴 쇼츠를 만들어 드립니다.</>
+          ) : (
+            <>설교(예배) 유튜브 링크를 넣으면 AI가 하이라이트를 찾아<br className="hidden sm:block" /> 쇼츠를 만들어 드립니다 (자막 on/off 가능).</>
+          )}
         </p>
+        <div className="mx-auto mt-6 inline-grid grid-cols-2 gap-1 rounded-2xl border border-line bg-panel p-1">
+          {([["sermon", "🎤 설교 쇼츠"], ["praise", "🎵 찬양 쇼츠"]] as const).map(([k, l]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setMode(k)}
+              className={`rounded-xl px-5 py-2 font-bold transition ${mode === k ? "bg-accent text-black" : "text-muted hover:text-white"}`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-2xl border border-line bg-panel p-6 shadow-xl sm:p-8">
@@ -179,10 +200,10 @@ export default function SetupForm({
             return (
               <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
                 <p className="font-bold">{AI_NAME[id]}을(를) 쓰려면 이 컴퓨터에서 한 번 로그인해 주세요.</p>
-                <p className="mt-1 text-muted">터미널(맥: 응용 프로그램 → 유틸리티 → 터미널)을 열고 아래를 입력한 뒤, 안내에 따라 유료 구독 계정으로 로그인합니다.</p>
+                <p className="mt-1 text-muted">{IS_WIN ? "PowerShell(시작 → PowerShell)" : "터미널(응용 프로그램 → 유틸리티 → 터미널)"}을 열고 아래를 입력한 뒤, 안내에 따라 유료 구독 계정으로 로그인합니다.</p>
                 {!st?.installed && <code className="mt-2 block rounded bg-black/40 px-2 py-1 font-mono">{INSTALL[id]}</code>}
                 <code className="mt-2 block rounded bg-black/40 px-2 py-1 font-mono">{LOGIN[id]}</code>
-                {id === "gemini" && <p className="mt-1 text-xs text-muted">처음 실행하면 나오는 화면에서 &quot;Login with Google&quot;을 고르고, Google AI Pro·Ultra 구독 계정으로 로그인하세요. 끝나면 /quit 로 나옵니다.</p>}
+                {id === "gemini" && <p className="mt-1 text-xs text-muted">Gemini 구독은 구글의 Antigravity CLI(agy)로 씁니다(예전 Gemini CLI 개인 로그인은 구글이 끝냈습니다). agy 를 실행해 Google AI Pro·Ultra 구독 계정으로 로그인하세요.</p>}
                 <button type="button" onClick={recheck} className="mt-2 text-accent underline">{checking ? "확인 중..." : "로그인했어요 — 다시 확인"}</button>
               </div>
             );
@@ -235,7 +256,7 @@ export default function SetupForm({
         </Field>
 
         {/* URL */}
-        <Field n={3} label="설교 유튜브 링크">
+        <Field n={3} label={mode === "praise" ? "예배·찬양 유튜브 링크" : "설교 유튜브 링크"}>
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -243,7 +264,9 @@ export default function SetupForm({
             className="input"
           />
           <p className="mt-2 text-xs text-muted">
-            찬양·광고가 포함된 예배 전체 영상도 괜찮아요. 설교 부분을 자동으로 찾습니다.
+            {mode === "praise"
+              ? "예배 전체 영상도 괜찮아요. 찬양 부분을 자동으로 찾습니다. 유튜브 자동 자막에 가사가 잡혀야 찾을 수 있어요(못 찾으면 다음 화면에서 시간을 직접 넣으면 됩니다)."
+              : "찬양·광고가 포함된 예배 전체 영상도 괜찮아요. 설교 부분을 자동으로 찾습니다."}
           </p>
         </Field>
 

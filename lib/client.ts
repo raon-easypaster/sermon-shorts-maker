@@ -22,11 +22,12 @@ export async function analyze(
   provider: string,
   targetSec: number,
   onProgress?: (p: number, msg: string) => void,
+  mode: "sermon" | "praise" = "sermon",
 ): Promise<AnalyzeResult> {
   const r = await fetch("/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url, apiKey, provider, targetSec }),
+    body: JSON.stringify({ url, apiKey, provider, targetSec, mode }),
   });
   const data = await r.json();
   if (!r.ok) throw new Error(data.error || "분석 요청 실패");
@@ -61,6 +62,7 @@ export async function addCustomRange(args: {
   endSec: number;
   apiKey: string;
   provider?: string;
+  mode?: "sermon" | "praise";
 }): Promise<Highlight> {
   const r = await fetch("/api/custom-range", {
     method: "POST",

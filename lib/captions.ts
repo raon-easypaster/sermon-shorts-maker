@@ -99,7 +99,28 @@ export function parsePlainVtt(raw: string): Cue[] {
   return cues;
 }
 
-// Cues fully or partially inside [start, end].
+// 화면·영상 자막용으로 다듬기: 유튜브 자동 자막의 HTML 기호(&gt; 등)를 글자로 풀고,
+// 화자 바뀜 표시(>>)와 [음악]·[노래]·[박수] 같은 소리 표시를 지운다.
+// (AI 에 넘기는 원래 자막에는 그대로 둔다 — 찬양 구간을 찾을 때 [노래] 표시가 단서가 된다.)
+export function cleanCaption(text: string): string {
+  return text
+    .replace(/&gt;/g, ">")
+    .replace(/&lt;/g, "<")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/>>+/g, " ")
+    .replace(/\[[^\]]{1,12}\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** 자막 목록을 다듬고, 다듬은 뒤 빈 자막은 뺀다 */
+export function cleanCues(cues: Cue[]): Cue[] {
+  return cues.map((c) => ({ ...c, text: cleanCaption(c.text) })).filter((c) => c.text);
+}
+
+// Cues fully or partially inside [start, end], cleaned for display.
 export function cuesInRange(cues: Cue[], start: number, end: number): Cue[] {
-  return cues.filter((c) => c.end > start && c.start < end);
+  return cleanCues(cues.filter((c) => c.end > start && c.start < end));
 }

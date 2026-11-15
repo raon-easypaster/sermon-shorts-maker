@@ -13,7 +13,7 @@ const PROVIDERS: Provider[] = ["auto", "gemini-api", "claude", "codex", "gemini"
 export async function POST(req: NextRequest) {
   const denied = rejectForeign(req);
   if (denied) return denied;
-  const { url, apiKey, targetSec, provider } = await req.json();
+  const { url, apiKey, targetSec, provider, mode } = await req.json();
   const key = (apiKey && sanitizeApiKey(apiKey)) || process.env.GEMINI_API_KEY || "";
   const p: Provider = PROVIDERS.includes(provider) ? provider : "auto";
 
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   if (p === "gemini-api" && !key) return NextResponse.json({ error: "Gemini API 키가 필요합니다." }, { status: 400 });
 
   const job = createJob("analyze");
-  runJob(job, (progress) => runAnalyze(url, { provider: p, apiKey: key || undefined }, Number(targetSec) || 60, progress));
+  runJob(job, (progress) => runAnalyze(url, { provider: p, apiKey: key || undefined }, Number(targetSec) || 60, progress, mode === "praise" ? "praise" : "sermon"));
 
   return NextResponse.json({ jobId: job.id });
 }

@@ -74,6 +74,7 @@ export interface AnalyzeResult {
   meta: VideoMeta;
   highlights: Highlight[];
   hasCaptions: boolean;
+  mode?: "sermon" | "praise";
 }
 
 export interface RenderRequest {

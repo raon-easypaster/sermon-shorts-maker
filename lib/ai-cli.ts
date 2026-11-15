@@ -1,5 +1,5 @@
 // 이 컴퓨터에 로그인된 AI 구독(Claude · ChatGPT · Gemini)으로 글을 만든다.
-// API 키나 추가 요금 없이, 각 회사의 공식 명령줄 도구(claude / codex / gemini)를 실행해 구독 사용량을 쓴다.
+// API 키나 추가 요금 없이, 각 회사의 공식 명령줄 도구(claude / codex / agy·gemini)를 실행해 구독 사용량을 쓴다.
 // 다른 폴더의 설정·파일을 읽지 않도록 빈 작업 폴더에서, 도구 없이 글만 쓰게 실행한다.
 
 import fs from "node:fs";
@@ -145,9 +145,14 @@ export async function aiStatus(force = false): Promise<AiStatus> {
       (r) => ({ installed: true, loggedIn: /Logged in/i.test(r.out + r.err) }),
       () => off,
     ),
-    run("gemini", ["--version"], null, 15_000).then(
-      () => ({ installed: true, loggedIn: geminiLoggedIn() }),
-      () => off,
+    // Antigravity(agy): 모델 목록을 받아 오면 로그인된 것. 없으면 예전 gemini 명령.
+    run("agy", ["models"], null, 30_000).then(
+      (r) => ({ installed: true, loggedIn: r.code === 0 && /gemini/i.test(r.out) }),
+      () =>
+        run("gemini", ["--version"], null, 15_000).then(
+          () => ({ installed: true, loggedIn: geminiLoggedIn() }),
+          () => off,
+        ),
     ),
   ]);
   const st = { claude, codex, gemini };
@@ -216,10 +221,43 @@ async function withCodex(prompt: string): Promise<string> {
   throw new AiError(`ChatGPT(Codex) 실행 실패: ${last.slice(0, 300)}`);
 }
 
-async function withGemini(prompt: string): Promise<string> {
-  // 글은 표준입력으로, -p 는 비대화(headless) 실행 표시용. 도구는 쓰지 않는다(plan = 읽기 전용).
-  // plan = 읽기 전용, 확장·MCP 서버는 끄고, 빈 폴더에서 실행 (읽을 파일이 없게)
-  const r = await run("gemini", ["-p", " ", "-o", "json", "--approval-mode", "plan", "-e", "none", "--allowed-mcp-server-names", "__none__"], prompt, TIMEOUT);
+// Gemini 구독: 구글이 개인 무료 등급의 Gemini CLI 로그인을 끝내고 Antigravity 로 옮겼다.
+// 그래서 Antigravity CLI(agy)가 있으면 그것을 쓰고, 없을 때만 예전 gemini 명령을 쓴다.
+const AGY_MODEL = process.env.AGY_MODEL || "gemini-3.8-flash-high";
+
+async function withAgy(prompt: string): Promise<string> {
+  // 윈도우 명령줄 길이 제한(약 3만 자) 때문에 긴 자막은 작업 폴더의 파일로 넘긴다.
+  // 작업 폴더는 이번 실행만 쓰는 빈 임시 폴더이고, plan(읽기 전용) 모드로 돌린다.
+  const r = await run(
+    "agy",
+    (dir) => {
+      fs.writeFileSync(path.join(dir, "request.txt"), prompt);
+      return [
+        "-p",
+        "이 작업 폴더의 request.txt 파일에 할 일이 적혀 있습니다. 그 파일만 읽고, 거기 적힌 대로 답하세요. 다른 파일·명령·검색은 쓰지 마세요.",
+        "--output-format", "json", "--mode", "plan", "--model", AGY_MODEL, "--print-timeout", `${Math.round(TIMEOUT / 1000)}s`, "--disable-slash-commands",
+      ];
+    },
+    null,
+    TIMEOUT + 30_000,
+  );
+  let j: { status?: string; response?: string; error?: string } | null = null;
+  try {
+    j = JSON.parse(r.out.slice(r.out.indexOf("{")));
+  } catch {
+    j = null;
+  }
+  if (j?.status === "SUCCESS" && j.response) return j.response;
+  const m = j?.error || (r.err || r.out).trim().slice(-300) || `종료 코드 ${r.code}`;
+  if (/log ?in|auth|credential|sign in/i.test(m)) throw new AiError("Gemini(Antigravity)에 로그인되어 있지 않습니다. 터미널에서 agy 를 실행해 구글 계정으로 로그인해 주세요.", "login");
+  if (limitRe.test(m)) throw new AiError(`Gemini 구독 사용 한도에 걸렸습니다: ${m.slice(0, 200)}`, "limit");
+  throw new AiError(`Gemini(Antigravity) 실행 실패: ${m.slice(0, 300)}`);
+}
+
+async function withGeminiCli(prompt: string): Promise<string> {
+  // 글은 표준입력으로, -p 는 비대화(headless) 실행 표시용.
+  // plan = 읽기 전용, 확장·MCP 서버는 끄고, 이번 실행만 쓰는 빈 임시 폴더에서 실행(--skip-trust: 그 빈 폴더를 믿음).
+  const r = await run("gemini", ["-p", " ", "-o", "json", "--approval-mode", "plan", "-e", "none", "--allowed-mcp-server-names", "__none__", "--skip-trust"], prompt, TIMEOUT);
   const start = r.out.indexOf("{");
   let j: { response?: string; error?: { message?: string } } | null = null;
   try {
@@ -229,9 +267,19 @@ async function withGemini(prompt: string): Promise<string> {
   }
   if (j?.response) return j.response;
   const m = j?.error?.message || (r.err || r.out).trim().slice(-300) || `종료 코드 ${r.code}`;
+  if (/no longer supported|Antigravity|IneligibleTier/i.test(m + r.err)) throw new AiError("구글이 Gemini CLI 개인 로그인을 끝냈습니다. Antigravity CLI(agy)를 설치하고 구글 계정으로 로그인해 주세요: https://antigravity.google", "login");
   if (/auth method|log ?in|credential|oauth/i.test(m)) throw new AiError("Gemini에 로그인되어 있지 않습니다. 터미널에서 gemini 를 실행해 'Login with Google'로 로그인해 주세요.", "login");
   if (limitRe.test(m)) throw new AiError(`Gemini 구독 사용 한도에 걸렸습니다: ${m.slice(0, 200)}`, "limit");
   throw new AiError(`Gemini 실행 실패: ${m.slice(0, 300)}`);
+}
+
+async function withGemini(prompt: string): Promise<string> {
+  try {
+    return await withAgy(prompt);
+  } catch (e) {
+    if ((e as AiError).kind !== "missing") throw e;
+  }
+  return withGeminiCli(prompt);
 }
 
 export function cliGenerate(provider: CliProvider, prompt: string): Promise<string> {

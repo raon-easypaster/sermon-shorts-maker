@@ -23,10 +23,12 @@ Gemini API 키는 화면에서 입력하며 **브라우저에만 저장**됩니�
 
 ## 📥 데스크톱 앱 (Windows 전용 설치 파일)
 
-**[설치 파일 받기 (Windows)](https://github.com/Rojaewon/sermon-shorts-maker/releases/latest)**
+**[설치 파일 받기 (Windows)](https://github.com/raon-easypaster/sermon-shorts-maker/releases/latest)**
 
-설치법·사용법은 [최신 릴리스 안내](https://github.com/Rojaewon/sermon-shorts-maker/releases/latest)를 참고하세요.
-무료 Gemini API 키만 있으면 되고, 모든 처리는 본인 컴퓨터에서 이루어집니다.
+설치법·사용법은 [최신 릴리스 안내](https://github.com/raon-easypaster/sermon-shorts-maker/releases/latest)를 참고하세요.
+AI는 **Claude · ChatGPT · Gemini 유료 구독**(이 컴퓨터에 로그인해 두면 API 요금 없이) 또는 **Gemini API 키** 중 고를 수 있고, 영상 처리는 모두 본인 컴퓨터에서 이루어집니다. AI에는 자막 글만 보냅니다.
+
+- **설교 쇼츠 / 찬양 쇼츠** — 화면 맨 위에서 고릅니다. 찬양 쇼츠는 예배 영상에서 부른 곡들을 찾아 곡마다 후렴 구간을 쇼츠로 만들고, 제목에 곡명을 넣습니다.
 
 - **AI 하이라이트 분석** — 설교 전체 구조(중심 메시지·대지)를 먼저 파악한 뒤, 그 맥락 안에서 하이라이트 5~6개를 고릅니다.
 - **말 중간에 끊기지 않음** — 자막 큐 경계 + 실제 침묵 구간을 근거로 시작·끝을 보정합니다.
@@ -38,9 +40,14 @@ Gemini API 키는 화면에서 입력하며 **브라우저에만 저장**됩니�
 
 ```bash
 npm install
-npm run dev      # http://localhost:3939
-npm run dist     # 배포용 설치 파일 빌드 -> dist/
+npm run dev      # http://127.0.0.1:3939 (이 컴퓨터에서만 열림)
+npm test         # 기존 기능 점검(하네스) — 고칠 때마다
+npm run verify   # 타입 검사 + 하네스 + next build — 배포 전 필수
+npm run smoke    # 켜져 있는 서버로 쇼츠 한 편을 실제로 만들어 확인 (--ai claude 로 AI까지)
+npm run dist     # verify 를 통과해야만 설치 파일을 만듦 -> dist/
 ```
+
+윈도우 설치 파일은 `v0.3.0` 같은 태그를 올리면 GitHub Actions(윈도우 빌드 서버)가 하네스 시험을 거쳐 만들고 릴리스에 올립니다(`.github/workflows/windows.yml`).
 
 `ffmpeg`와 `yt-dlp`는 첫 실행 때 자동으로 받아옵니다. 별도 설치가 필요 없습니다.
 

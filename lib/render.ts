@@ -6,6 +6,7 @@
 //
 // Layout constants come from layout.ts (measured from sample videos).
 
+import { cleanCues } from "./captions";
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -57,7 +58,7 @@ export async function renderHighlight(params: RenderParams): Promise<string> {
   const tpl = TEMPLATES[params.template];
 
   // clip-relative cues
-  const relCues: Cue[] = params.cues
+  const relCues: Cue[] = cleanCues(params.cues)
     .map((c) => ({
       start: c.start - params.startSec,
       end: c.end - params.startSec,

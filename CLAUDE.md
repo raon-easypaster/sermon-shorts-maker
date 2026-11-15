@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Korean-language web app: paste a sermon YouTube link → AI picks 5–6 highlight segments → renders them as 1080×1920 shorts with burned-in subtitles. UI text is Korean; keep it that way.
 
+Two modes: **설교 쇼츠** (sermon highlights, 2-pass structure → highlights) and **찬양 쇼츠** (`praisePrompt` in `lib/gemini.ts`: find songs from `[노래]`/`[음악]` markers + lyric captions, one chorus clip per song, song title on title line 2; lyric subtitles default off because auto-captions of singing are unreliable).
+
+AI runs either through a **Gemini API key** or a **local subscription CLI** (`lib/ai-cli.ts`: `claude`, `codex`, `gemini` — logged in on this computer, no API cost). CLIs run in a fresh private temp dir with tools off; `cleanCaption` strips `&gt;&gt;` and `[음악]` from display/render text but the AI still sees raw captions. API routes accept only requests from this computer's own page (`lib/guard.ts`) and the server binds 127.0.0.1.
+
 ## Commands
 
 ```bash
@@ -14,7 +18,19 @@ npm run build    # production build
 npx tsc --noEmit # typecheck — the only static check that exists
 ```
 
-There is **no test suite and no linter**. (`npm run lint` is a dead script: Next 16 removed `next lint`, so it fails parsing "lint" as a directory.) Verification is done by running the real pipeline and inspecting output — see "Verifying changes".
+```bash
+npm test         # 하네스 (vitest, tests/) — 기존 기능이 바뀌지 않았는지
+npm run verify   # tsc + 하네스 + next build — 배포·설치 파일 전 필수 (npm run dist 가 먼저 돈다)
+npm run smoke    # 켜진 서버로 실제 한 편 렌더 (1080×1920, 길이, 빈 화면, >>/[음악] 자막 확인)
+```
+
+**하네스 규칙 (사용자 요청: 업그레이드해도 이전 기능이 바뀌지 않게)**
+- 기능을 바꾸기 전과 후에 `npm test` 를 돌린다. 실패하면 고친 쪽이 틀린 것으로 보고, 일부러 바꾼 동작일 때만 시험을 고친다(스냅숏은 `npx vitest -u` 로 — 무엇이 왜 바뀌었는지 확인한 뒤에만).
+- 버그를 고치면 그 버그를 잡는 시험을 `tests/` 에 하나 더한다.
+- 배포(태그·설치 파일) 전에는 `npm run verify` 와 `npm run smoke` 를 모두 통과시킨다. GitHub Actions 도 올릴 때마다 시험을 돌린다.
+- 시험에 쓰는 자막·설교 글은 지어낸 예시만 쓴다 (실제 성도·설교 내용을 저장소에 넣지 않음).
+
+There is no linter. (`npm run lint` is a dead script: Next 16 removed `next lint`, so it fails parsing "lint" as a directory.)
 
 ## Architecture
 
@@ -80,7 +96,7 @@ The key comes from the browser (`localStorage`), is sent per-request, and used o
 
 ## Verifying changes
 
-There are no tests; verify by observing real behavior.
+Run the harness first (`npm test`), then observe real behavior (`npm run smoke`).
 
 - **Render changes**: render a clip, extract a frame (`ffmpeg -ss N -i out.mp4 -vframes 1 f.png`), and *look at it*. To check geometry precisely, decode to raw RGB and scan rows for band boundaries rather than trusting your eyes — that's how `lib/layout.ts` was derived, and how a regression in it should be caught.
 - **Pipeline plumbing** can be exercised without a valid Gemini key: `POST /api/analyze` with a dummy key reaches ~55% (metadata + captions succeed) and fails only at the Gemini call. Getting that far proves everything except the AI itself.

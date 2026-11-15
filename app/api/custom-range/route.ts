@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   const denied = rejectForeign(req);
   if (denied) return denied;
-  const { videoId, startSec, endSec, apiKey, provider } = await req.json();
+  const { videoId, startSec, endSec, apiKey, provider, mode } = await req.json();
   const key = (apiKey && sanitizeApiKey(apiKey)) || process.env.GEMINI_API_KEY;
   const cues = loadCues(videoId);
   if (!cues) return NextResponse.json({ error: "자막 캐시가 없습니다. 다시 분석해 주세요." }, { status: 400 });
@@ -21,11 +21,11 @@ export async function POST(req: NextRequest) {
   const inRange = cuesInRange(cues, Number(startSec), Number(endSec));
   const text = inRange.map((c) => c.text).join(" ");
 
-  let title = { titleLine1: "설교 하이라이트", titleLine2: "", summary: text.slice(0, 60) };
+  let title = { titleLine1: mode === "praise" ? "오늘의 찬양" : "설교 하이라이트", titleLine2: "", summary: text.slice(0, 60) };
   if (text) {
     try {
       const run = { provider: await resolveProvider({ provider: (provider as Provider) || "auto", apiKey: key || undefined }), apiKey: key || undefined };
-      title = await generateTitle(run, text);
+      title = await generateTitle(run, text, mode === "praise" ? "praise" : "sermon");
     } catch {
       /* keep default */
     }

@@ -1,6 +1,6 @@
 {
   "name": "sermon-shorts-creator",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
     "dev": "next dev -H 127.0.0.1 -p 3939",
@@ -8,7 +8,10 @@
     "start": "next start -H 127.0.0.1 -p 3939",
     "electron:prepare": "node electron/prepare.mjs",
     "electron:dev": "electron .",
-    "dist": "next build && node electron/prepare.mjs && electron-builder"
+    "dist": "npm run verify && node electron/prepare.mjs && electron-builder",
+    "test": "vitest run",
+    "verify": "tsc --noEmit && vitest run && next build",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
@@ -31,6 +34,7 @@
     "rcedit": "^5.0.2",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",
+    "vitest": "^3.2.7",
     "wait-on": "^8.0.5"
   },
   "main": "electron/main.js"

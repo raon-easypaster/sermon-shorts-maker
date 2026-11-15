@@ -239,6 +239,41 @@ ${numberedTranscript(cues)}
   return result.highlights;
 }
 
+// ---- 찬양 쇼츠 ----
+// 예배 영상 자동 자막에서 찬양 곡들을 찾고, 곡마다 가장 좋은 구간(주로 후렴) 하나를 고른다.
+// 자동 자막은 노래 부분에 [노래]·[음악] 표시를 붙이고 가사를 (틀리게라도) 받아 적는다 — 이것이 단서다.
+export type ShortsMode = "sermon" | "praise";
+
+export function praisePrompt(cues: Cue[], targetSec: number): string {
+  const avgCueDur = cues.length > 1 ? (cues[cues.length - 1].end - cues[0].start) / cues.length : 5;
+  const approxCues = Math.max(4, Math.round(targetSec / avgCueDur));
+  return `당신은 교회 예배 영상에서 찬양 쇼츠(짧은 영상)로 만들 구간을 고르는 편집자입니다.
+
+## 자막 (인덱스, 시각 포함)
+아래는 예배 영상 전체의 유튜브 자동 자막입니다. 노래하는 부분에는 보통 [노래]·[음악] 표시가 붙고, 가사가 소리 나는 대로(틀린 글자가 많게) 적혀 있습니다. 같은 구절이 되풀이되는 곳이 후렴일 가능성이 큽니다.
+${numberedTranscript(cues)}
+
+## 과제
+1. 이 영상에서 회중이나 찬양팀이 부른 찬양 곡들을 찾으세요. 설교·기도·광고·대표기도·말씀 낭독은 빼세요.
+2. 곡마다 쇼츠로 만들기 가장 좋은 구간 하나(대개 후렴이나 가장 힘 있게 부르는 부분)를 고르세요. 최대 6곡.
+3. JSON으로 답하세요. 각 항목:
+- startCueIdx, endCueIdx: 자막 인덱스. 목표 길이 약 ${targetSec}초(대략 ${approxCues}개 자막), 30초~2분.
+- titleLine2: 곡 제목. 가사로 알 수 있는 널리 알려진 찬송가·CCM이면 정확한 제목을, 모르겠으면 가장 또렷한 가사 한 구절(12자 이내).
+- titleLine1: 짧은 머리말 (예: "오늘의 찬양", "함께 부르는 찬양", 또는 가사 속 짧은 고백). 6~12자.
+- summary: 이 구간에서 부르는 가사 내용 한 문장 (틀린 자막 글자는 바로잡아서).
+- sectionTitle: 곡 제목(또는 위의 가사 구절).
+
+## 규칙
+- 곡의 처음이나 한 소절 중간에서 시작하지 말고, 소절이 시작되는 자막에서 시작해 소절이 끝나는 자막에서 끝내세요.
+- 같은 곡에서 두 구간을 고르지 마세요.
+- 찬양이 하나도 없으면 빈 목록을 주세요.`;
+}
+
+export async function analyzePraise(run: AiRun, cues: Cue[], targetSec: number): Promise<RawHighlight[]> {
+  const result = await genJson<{ highlights: RawHighlight[] }>(run, praisePrompt(cues, targetSec), highlightsSchema);
+  return result.highlights || [];
+}
+
 // Generate a 2-line title for a user-added custom range.
 const titleSchema = {
   type: Type.OBJECT,
@@ -253,7 +288,15 @@ const titleSchema = {
 export async function generateTitle(
   run: AiRun,
   text: string,
+  mode: ShortsMode = "sermon",
 ): Promise<{ titleLine1: string; titleLine2: string; summary: string }> {
+  if (mode === "praise") {
+    return genJson(
+      run,
+      `아래는 예배 중 찬양을 부르는 한 구간의 유튜브 자동 자막입니다(가사가 틀리게 적혀 있을 수 있음). 찬양 쇼츠 상단에 넣을 2줄 제목과 1문장 요약을 JSON으로 만들어 주세요. titleLine2는 곡 제목(알 수 없으면 가장 또렷한 가사 한 구절, 12자 이내), titleLine1은 6~12자 짧은 머리말(예: "오늘의 찬양").\n\n자막:\n${text}`,
+      titleSchema,
+    );
+  }
   const prompt = `아래는 설교 중 한 구간의 자막입니다. 이 구간을 쇼츠로 만들 때 상단에 넣을 2줄 제목과 1문장 요약을 JSON으로 만들어 주세요. titleLine2가 강조 문구가 되도록 하고, 각 줄은 6~12자로 짧고 강렬하게.
 
 자막:
